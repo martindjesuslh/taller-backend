@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taller_arte_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/taller_arte_dev
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+      - /app/.venv
+
+volumes:
+  postgres_dev_:
