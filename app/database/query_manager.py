@@ -86,11 +86,13 @@ class QueryManager:
                     else await self.conn.execute(query)
                 )
 
-                affected_rows = int(result.split()[-1]) if " " in result else 0
+                affected_rows = 0
+                if " " in result and result.split()[-1].isdigit():
+                    affected_rows = int(result.split()[-1])
 
                 return QueryResult(
                     success=True,
-                    data=data,
+                    data=[],
                     message="Write operation completed",
                     affected_rows=affected_rows,
                 )

@@ -18,11 +18,15 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/taller_arte_dev
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: taller_arte_dev
     depends_on:
       - db
     volumes:
       - .:/app
-      - /app/.venv
 
 volumes:
   postgres_dev_:

@@ -74,7 +74,7 @@ class DatabaseManager:
                 logger.error(f"Transaction rolled back due to error {e}")
             raise
         finally:
-            await self.pool.release()
+            await self.pool.release(conn)
 
     async def health_check(self) -> bool:
         try:
