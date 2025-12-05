@@ -2,33 +2,66 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from logging import getLogger
 
-from app.api.v1.routers import users
-from app.database.seeder import init_seeder
+#from app.api.v1.routers import users
+from app.config.database import db_manager
+from app.database.seeder import run_seeder
 
 logger = getLogger(__name__)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Running database initialization...")
-    try:
-        await init_seeder()
-        logger.info("Database initialization completed successfully")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+    logger.info("Starting ADA Restauraciones API")
 
-    logger.info("Application startup complete")
+    try:
+        logger.info("Initializing database connection pool...")
+        await db_manager.connect()
+        logger.info("Database pool connected")
+
+        logger.info("Running database seeder...")
+        await run_seeder()
+        logger.info("Database seeding completed")
+
+        logger.info("Performing database health check...")
+        is_healthy = await db_manager.health_check()
+        if is_healthy:
+            logger.info("Database health check passed")
+        else:
+            logger.warning("Database health check failed")
+
+        logger.info("Application startup completed successfully")
+
+    except Exception as e:
+        logger.error(f"APlication startup failed {e}")
+
+        raise
 
     yield
 
-    logger.info("Application shutdown")
+    logger.info("Shutting down ADA Restauraciones")
 
+    try:
+        logger.info("Closing database connection pool...")
+        await db_manager.disconnect()
+        logger.info("Database pool disconnected")
 
-app = FastAPI(title="ADA Restauraciones API", lifespan=lifespan)
+    except Exception as e:
+        logger.error(f"Error during shutdown {e}")
 
-app.include_router(users.router, prefix="/api/v1", tags=["users"])
+    logger.info("Application shutdown completed")
+
+app = FastAPI(
+    title="ADA Restauraciones API",
+    description="API para gestión de taller de restauración de arte",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
 
 @app.get("/")
-def read_root():
-    return {"message": "Bienvenido a ADA Restauraciones API"}
+async def read_root():
+    """Endpoint raíz de bienvenida"""
+    return {
+        "message": "Bienvenido a ADA Restauraciones API",
+        "version": "0.1.0",
+        "docs": "/docs"
+    }
