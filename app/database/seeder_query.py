@@ -1,3 +1,18 @@
+# -- ----------------------------------------------------------------------------
+# --  CONFIG
+# -- ----------------------------------------------------------------------------
+
+CONFIGURE_TIMEZONE = """
+SET timezone = 'UTC';
+"""
+
+CREATE_CONFIGS = [CONFIGURE_TIMEZONE]
+
+# -- ----------------------------------------------------------------------------
+# --  SCHEMAS
+# -- ----------------------------------------------------------------------------
+
+
 CREATE_SCHEMA_PUBLIC = """
 CREATE SCHEMA IF NOT EXISTS "public";
 """
@@ -66,7 +81,7 @@ CREATE TABLE IF NOT EXISTS "user".employees (
 	phone VARCHAR(20) NULL,
 	address TEXT,
 	is_active BOOL DEFAULT true,
-	password_hash VARCHAR(255) NOT NULL,
+	password VARCHAR(255) NOT NULL,
     role_id INTEGER NOT NULL,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

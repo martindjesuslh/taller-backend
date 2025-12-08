@@ -4,6 +4,14 @@ import asyncpg
 
 logger = getLogger(__name__)
 
+ERRORES_STATUS_MAP = {
+    "unique": 409,
+    "duplique": 409,
+    "foreign key": 400,
+    "not null": 400,
+    "check constraint": 400,
+}
+
 
 class QueryResult:
     def __init__(
@@ -12,12 +20,14 @@ class QueryResult:
         data: List[Dict[str, Any]],
         message: Optional[str] = None,
         error: Optional[str] = None,
+        status_code: Optional[int] = None,
         affected_rows: int = 0,
     ):
         self.success = success
         self.data = data
         self.message = message
         self.error = error
+        self.status_code = status_code
         self.affected_rows = affected_rows
 
     def dict(self):
@@ -26,6 +36,7 @@ class QueryResult:
             "data": self.data,
             "message": self.message,
             "error": self.error,
+            "status_code": self.status_code,
             "affected_rows": self.affected_rows,
         }
 
@@ -56,6 +67,15 @@ class QueryManager:
         if self._owns_connection and self._db_manager.pool:
             await self._db_manager.pool.release(conn)
 
+    def _detect_error_status(self, error_msg: str) -> int:
+        error_lower = error_msg.lower()
+
+        for keyword, status in ERRORES_STATUS_MAP.items():
+            if keyword in error_lower:
+                return status
+
+        return 500
+
     async def select(self, query: str, params: Optional[Tuple] = None) -> QueryResult:
         try:
             conn = await self._get_connection()
@@ -74,9 +94,15 @@ class QueryManager:
             )
 
         except Exception as e:
+            error_msg = str(e)
+            status_code = self._detect_error_status(error_msg)
             logger.error(f"Query execution error: {e}")
             return QueryResult(
-                success=False, data=[], message="Query execution failed", error=str(e)
+                success=False,
+                data=[],
+                message="Query execution failed",
+                error=str(e),
+                status_code=status_code,
             )
 
         finally:
@@ -125,9 +151,15 @@ class QueryManager:
                 )
 
         except Exception as e:
+            error_msg = str(e)
+            status_code = self._detect_error_status(error_msg)
             logger.error(f"Write operation error: {e}")
             return QueryResult(
-                success=False, data=[], message="Write operation failed", error=str(e)
+                success=False,
+                data=[],
+                message="Write operation failed",
+                error=str(e),
+                status_code=status_code,
             )
 
         finally:
@@ -179,12 +211,15 @@ class QueryManager:
                 )
 
             except Exception as e:
+                error_msg = str(e)
+                status_code = self._detect_error_status(error_msg)
                 logger.error(f"Transaction failed: {e}")
                 return QueryResult(
                     success=False,
                     data=[],
                     message="Transaction failed",
                     error=str(e),
+                    status_code=status_code,
                     affected_rows=total_affected,
                 )
 
@@ -202,7 +237,13 @@ class QueryManager:
                 affected_rows=affected_rows,
             )
         except Exception as e:
+            error_msg = str(e)
+            status_code = self._detect_error_status(error_msg)
             logger.error(f"Batch operation error {e}")
             return QueryResult(
-                success=False, data=[], message="Batch operation failed", error=str(e)
+                success=False,
+                data=[],
+                message="Batch operation failed",
+                error=str(e),
+                status_code=status_code,
             )
