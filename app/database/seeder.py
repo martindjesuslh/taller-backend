@@ -3,6 +3,7 @@ from logging import getLogger
 from app.config.database import db_manager
 from app.database.query_manager import QueryManager
 from app.database.seeder_query import (
+    CREATE_CONFIGS,
     CREATE_SCHEMAS,
     CREATE_TABLES,
     CREATE_INDEXES,
@@ -17,7 +18,8 @@ async def run_seeder():
     logger.info("Starting database seeding...")
 
     all_queries = (
-        CREATE_SCHEMAS
+        CREATE_CONFIGS
+        + CREATE_SCHEMAS
         + CREATE_TABLES
         + CREATE_INDEXES
         + CREATE_FUNCTIONS
