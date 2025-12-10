@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Callable
 from fastapi import HTTPException
+
 from fastapi.responses import JSONResponse
+from app.utils.serializers import serialize_data
 
 
 class ApiResponse:
@@ -20,7 +22,7 @@ class ApiResponse:
         content = {
             "success": True,
             "message": message,
-            "data": data or [],
+            "data": serialize_data(data) if data else [],
             "status": status_code,
             "timestamp": datetime.now().isoformat(),
         }

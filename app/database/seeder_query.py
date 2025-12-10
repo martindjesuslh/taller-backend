@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS "user".roles (
 	name VARCHAR(50) NOT NULL UNIQUE,
 	description TEXT NULL,
 	is_active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 """
 
@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS "user".permissions (
 	resource VARCHAR(50) NOT NULL,
 	action VARCHAR(50) NOT NULL,
 	description TEXT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
 	CONSTRAINT permissions_resource_action_unique UNIQUE (resource, action),
 	CONSTRAINT permissions_check CHECK (action IN ('create', 'read', 'update', 'delete'))
 );
@@ -57,8 +57,8 @@ CREATE TABLE IF NOT EXISTS "user".role_permissions (
 	id SERIAL PRIMARY KEY,
     permission_id INTEGER NOT NULL,
     role_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
 
     CONSTRAINT fk_role_permissions_role
         FOREIGN KEY (role_id)
@@ -83,8 +83,8 @@ CREATE TABLE IF NOT EXISTS "user".employees (
 	is_active BOOL DEFAULT true,
 	password VARCHAR(255) NOT NULL,
     role_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
     
     CONSTRAINT fk_employee_role
         FOREIGN KEY (role_id)
@@ -136,7 +136,7 @@ CREATE_FUNCTION_UPDATE_UPDATED_AT_COLUMN = """
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
+    NEW.updated_at = NOW();
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
