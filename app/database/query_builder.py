@@ -34,9 +34,18 @@ class QueryBuilder:
         return self
 
     def where(self, **filters) -> "QueryBuilder":
+        self.__where_conditions(False, filters)
+        return self
+
+    def where_like(self, **filters) -> "QueryBuilder":
+        self.__where_conditions(True, filters)
+        return self
+
+    def __where_conditions(self, ilike: bool, filters) -> "QueryBuilder":
+        conector = "ILIKE" if ilike else "="
         for field, value in filters.items():
             if value is not None:
-                self.__conditions.append(f"{field} = ${self.__param_count}")
+                self.__conditions.append(f"{field} {conector} ${self.__param_count}")
                 self.__params.append(value)
                 self.__param_count += 1
         return self
