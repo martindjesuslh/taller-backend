@@ -1,10 +1,6 @@
-from fastapi import APIRouter, status
-from .handler import create_role_handler
-from app.schemas.auth import CreateRole
+from fastapi import APIRouter
+from . import roles
 
-auth_router = APIRouter(prefix="/auth", tags=["roles"])
+auth_router = APIRouter(prefix="/auth", tags=["Authentication & Authorization"])
 
-
-@auth_router.post("")
-async def create_role(data: CreateRole):
-    return await create_role_handler(data)
+auth_router.include_router(roles.router, prefix="/roles", tags=["roles"])
