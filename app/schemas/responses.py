@@ -1,24 +1,19 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Callable
-from fastapi import HTTPException
 
 from fastapi.responses import JSONResponse
 from app.utils.serializers import serialize_data
 
+TData = Optional[List[Dict[str, Any]]]
+
 
 class ApiResponse:
-    success: bool
-    message: str
-    data: List[Dict[str, Any]] = None
-    error_message: Optional[str] = None
-    status: int
-
     @staticmethod
     def success(
         message: str,
-        data: Optional[List[Dict[str, Any]]] = None,
+        data: TData = None,
         status_code: int = 200,
-    ):
+    ) -> JSONResponse:
         content = {
             "success": True,
             "message": message,
@@ -32,73 +27,69 @@ class ApiResponse:
     @staticmethod
     def error(
         message: str,
-        error_message: str,
+        errors: TData = None,
         status_code: int = 400,
-    ):
+    ) -> JSONResponse:
         detail = {
             "success": False,
             "message": message,
             "status": status_code,
-            "error_message": error_message,
+            "errores": errors,
             "timestamp": datetime.now().isoformat(),
         }
 
-        raise HTTPException(status_code=status_code, detail=detail)
+        return JSONResponse(status_code=status_code, content=detail)
 
     @staticmethod
-    def ok(
-        message: str = "Success", data: Optional[List[Dict[str, Any]]] = None
-    ) -> dict:
+    def ok(message: str = "Success", data: TData = None) -> JSONResponse:
         return ApiResponse.success(message, data, 200)
 
     @staticmethod
     def created(
         message: str = "Resource created successfully",
-        data: Optional[List[Dict[str, Any]]] = None,
-    ) -> dict:
+        data: TData = None,
+    ) -> JSONResponse:
         return ApiResponse.success(message, data, 201)
 
     @staticmethod
-    def no_content(message: str = "Operation completed successfully") -> dict:
-        return ApiResponse.success(message, [], 204)
+    def no_content(
+        message: str = "Operation completed successfully", data: TData = None
+    ) -> JSONResponse:
+        return ApiResponse.success(message, data, 204)
 
     @staticmethod
-    def bad_request(
-        message: str = "Bad request", errors: Optional[List[Dict[str, Any]]] = None
-    ) -> dict:
+    def bad_request(message: str = "Bad request", errors: TData = None) -> JSONResponse:
         return ApiResponse.error(message, errors, 400)
 
     @staticmethod
     def unauthorized(
-        message: str = "Unauthorized", errors: Optional[List[Dict[str, Any]]] = None
-    ) -> dict:
+        message: str = "Unauthorized", errors: TData = None
+    ) -> JSONResponse:
         return ApiResponse.error(message, errors, 401)
 
     @staticmethod
-    def forbidden(
-        message: str = "Forbidden", errors: Optional[List[Dict[str, Any]]] = None
-    ) -> dict:
+    def forbidden(message: str = "Forbidden", errors: TData = None) -> JSONResponse:
         return ApiResponse.error(message, errors, 403)
 
     @staticmethod
     def not_found(
         message: str = "Resource not found",
-        errors: Optional[List[Dict[str, Any]]] = None,
-    ) -> dict:
+        errors: TData = None,
+    ) -> JSONResponse:
         return ApiResponse.error(message, errors, 404)
 
     @staticmethod
     def conflict(
         message: str = "Resource already exists",
-        errors: Optional[List[Dict[str, Any]]] = None,
-    ) -> dict:
+        errors: TData = None,
+    ) -> JSONResponse:
         return ApiResponse.error(message, errors, 409)
 
     @staticmethod
     def internal_error(
         message: str = "Internal server error",
-        errors: Optional[List[Dict[str, Any]]] = None,
-    ) -> dict:
+        errors: TData = None,
+    ) -> JSONResponse:
         return ApiResponse.error(message, errors, 500)
 
 
@@ -117,19 +108,18 @@ STATUS_MAP: Dict[int, Callable] = {
 
 def from_status(
     status_code: int,
-    message: str,
-    data: Optional[List[Dict[str, Any]]] = None,
-    error_message: Optional[List[Dict[str, Any]]] = None,
-):
-    if status_code in STATUS_MAP:
-        func = STATUS_MAP[status_code]
+    message: Optional[str] = None,
+    data: TData = None,
+    errors: TData = None,
+) -> JSONResponse:
+    func = STATUS_MAP.get(status_code)
 
-        if status_code < 400:
-            return func(message, data)
-        else:
-            return func(message, error_message)
+    if not func:
+        if status_code >= 200 and status_code < 300:
+            return ApiResponse.success(message or "Success", status_code, data)
+        return ApiResponse.error(message or "An error occurred", status_code, errors)
 
-    if status_code >= 200 and status_code < 300:
-        return ApiResponse.success(message, data, status_code)
-    else:
-        return ApiResponse.error(message, error_message or "Unknown error", status_code)
+    if status_code < 400:
+        return func(message, data) if message else func(data=data)
+
+    return func(message, errors) if message else func(errors=errors)
