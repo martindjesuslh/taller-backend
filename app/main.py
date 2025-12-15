@@ -4,6 +4,7 @@ from logging import getLogger
 
 from app.config.database import db_manager
 from app.core.settings import settings
+from app.core.exceptions import global_exception_handler
 from app.database.seeder import run_seeder
 
 from app.api.v1.main_router import api_router
@@ -61,6 +62,8 @@ app = FastAPI(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+app.add_exception_handler(Exception, global_exception_handler)
 
 
 @app.get("/")
