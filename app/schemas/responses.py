@@ -116,8 +116,9 @@ def from_status(
 
     if not func:
         if status_code >= 200 and status_code < 300:
-            return ApiResponse.success(message or "Success", status_code, data)
-        return ApiResponse.error(message or "An error occurred", status_code, errors)
+            return ApiResponse.success(message or "Success", data, status_code)
+        
+        return ApiResponse.error(message or "An error occurred", errors, status_code)
 
     if status_code < 400:
         return func(message, data) if message else func(data=data)
