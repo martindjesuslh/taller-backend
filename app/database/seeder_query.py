@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS "user".employees (
 	address TEXT,
 	is_active BOOL DEFAULT true,
 	password VARCHAR(255) NOT NULL,
-    role_id INTEGER NOT NULL,
+    role_id INTEGER NOT NULL REFERENCES "user".roles(id) ON DELETE RESTRICT,
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
     

@@ -1,44 +1,8 @@
 from logging import getLogger
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any, Dict, Optional, List, Tuple
 import asyncpg
 
 logger = getLogger(__name__)
-
-ERRORES_STATUS_MAP = {
-    "unique": 409,
-    "duplique": 409,
-    "foreign key": 400,
-    "not null": 400,
-    "check constraint": 400,
-}
-
-
-class QueryResult:
-    def __init__(
-        self,
-        success: bool,
-        data: List[Dict[str, Any]],
-        message: Optional[str] = None,
-        error: Optional[str] = None,
-        status_code: Optional[int] = None,
-        affected_rows: int = 0,
-    ):
-        self.success = success
-        self.data = data
-        self.message = message
-        self.error = error
-        self.status_code = status_code
-        self.affected_rows = affected_rows
-
-    def dict(self):
-        return {
-            "success": self.success,
-            "data": self.data,
-            "message": self.message,
-            "error": self.error,
-            "status_code": self.status_code,
-            "affected_rows": self.affected_rows,
-        }
 
 
 class QueryManager:
@@ -67,16 +31,9 @@ class QueryManager:
         if self._owns_connection and self._db_manager.pool:
             await self._db_manager.pool.release(conn)
 
-    def _detect_error_status(self, error_msg: str) -> int:
-        error_lower = error_msg.lower()
-
-        for keyword, status in ERRORES_STATUS_MAP.items():
-            if keyword in error_lower:
-                return status
-
-        return 500
-
-    async def select(self, query: str, params: Optional[Tuple] = None) -> QueryResult:
+    async def select(
+        self, query: str, params: Optional[Tuple] = None
+    ) -> List[Dict[str, Any]]:
         try:
             conn = await self._get_connection()
 
@@ -84,26 +41,7 @@ class QueryManager:
                 await conn.fetch(query, *params) if params else await conn.fetch(query)
             )
 
-            data = [dict(row) for row in result]
-
-            return QueryResult(
-                success=True,
-                data=data,
-                message=f"Retrieved {len(data)} records",
-                affected_rows=len(data),
-            )
-
-        except Exception as e:
-            error_msg = str(e)
-            status_code = self._detect_error_status(error_msg)
-            logger.error(f"Query execution error: {e}")
-            return QueryResult(
-                success=False,
-                data=[],
-                message="Query execution failed",
-                error=str(e),
-                status_code=status_code,
-            )
+            return [dict(row) for row in result]
 
         finally:
             if conn:
@@ -111,7 +49,7 @@ class QueryManager:
 
     async def write(
         self, query: str, params: Optional[Tuple] = None, returning: bool = False
-    ) -> QueryResult:
+    ) -> List[Dict[str, Any]]:
         conn = None
         try:
             conn = await self._get_connection()
@@ -123,15 +61,8 @@ class QueryManager:
                     else await conn.fetch(query)
                 )
 
-                data = [dict(row) for row in result]
-                affected_rows = len(data)
+                return [dict(row) for row in result]
 
-                return QueryResult(
-                    success=True,
-                    data=data,
-                    message=f"Write operation completed, {affected_rows} rows returned",
-                    affected_rows=affected_rows,
-                )
             else:
                 result = (
                     await conn.execute(query, *params)
@@ -139,28 +70,7 @@ class QueryManager:
                     else await conn.execute(query)
                 )
 
-                affected_rows = 0
-                if " " in result and result.split()[-1].isdigit():
-                    affected_rows = int(result.split()[-1])
-
-                return QueryResult(
-                    success=True,
-                    data=[],
-                    message="Write operation completed",
-                    affected_rows=affected_rows,
-                )
-
-        except Exception as e:
-            error_msg = str(e)
-            status_code = self._detect_error_status(error_msg)
-            logger.error(f"Write operation error: {e}")
-            return QueryResult(
-                success=False,
-                data=[],
-                message="Write operation failed",
-                error=str(e),
-                status_code=status_code,
-            )
+                return []
 
         finally:
             if conn:
@@ -170,19 +80,13 @@ class QueryManager:
         self, queries: List[str], params_list: List[Tuple], returning: bool = False
     ):
         if len(queries) != len(params_list):
-            return QueryResult(
-                success=False,
-                data=[],
-                message="Transition failed",
-                error="The quantity of queries is different than params",
-            )
+            raise ValueError("The quantity of queries is different than params")
 
         all_data = []
-        total_affected = 0
 
         async with self._db_manager.get_transaction() as conn:
             try:
-                for i, (query, params) in enumerate(zip(queries, params_list)):
+                for query, params in zip(queries, params_list):
                     if returning:
                         result = (
                             await conn.fetch(query, *params)
@@ -191,59 +95,27 @@ class QueryManager:
                         )
                         data = [dict(row) for row in result]
                         all_data.extend(data)
-                        total_affected += len(data)
                     else:
                         result = (
-                            await conn.fetch(query, *params)
+                            await conn.execute(query, *params)
                             if params
-                            else await conn.fetch(query)
+                            else await conn.execute(query)
                         )
-                        if " " in result and result.split()[-1].isdigit():
-                            total_affected += int(result.split()[-1])
 
-                    logger.debug(f"Query {i + 1}/{len(queries)} executed successfully")
-
-                return QueryResult(
-                    success=True,
-                    data=all_data if returning else [],
-                    message=f"Transaction completed: {len(queries)} queries executed",
-                    affected_rows=total_affected,
-                )
+                    returning if returning else []
 
             except Exception as e:
-                error_msg = str(e)
-                status_code = self._detect_error_status(error_msg)
-                logger.error(f"Transaction failed: {e}")
-                return QueryResult(
-                    success=False,
-                    data=[],
-                    message="Transaction failed",
-                    error=str(e),
-                    status_code=status_code,
-                    affected_rows=total_affected,
-                )
+                logger.error(f"Transaction failed: Rolling back: {e}")
+                raise
 
-    async def bulk_execute(self, query: str, params_list: List[Tuple]) -> QueryResult:
+    async def bulk_execute(self, query: str, params_list: List[Tuple]):
         try:
             conn = await self._get_connection()
-
             await conn.executemany(query, params_list)
-            affected_rows = len(params_list)
 
-            return QueryResult(
-                success=True,
-                data=[],
-                message=f"Batch operation completed, {affected_rows} operations executed",
-                affected_rows=affected_rows,
-            )
         except Exception as e:
-            error_msg = str(e)
-            status_code = self._detect_error_status(error_msg)
-            logger.error(f"Batch operation error {e}")
-            return QueryResult(
-                success=False,
-                data=[],
-                message="Batch operation failed",
-                error=str(e),
-                status_code=status_code,
-            )
+            logger.error(f"Bulk operation failed: {e}")
+            raise
+        finally:
+            if conn:
+                await self._release_connection(conn)
